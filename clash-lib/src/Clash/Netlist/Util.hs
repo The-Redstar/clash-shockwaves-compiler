@@ -81,7 +81,7 @@ import           Clash.Annotations.BitRepresentation.ClashLib
 import           Clash.Annotations.BitRepresentation.Internal
   (CustomReprs, ConstrRepr'(..), DataRepr'(..), getDataRepr,
    uncheckedGetConstrRepr)
-import           Clash.Annotations.SynthesisAttributes (Attr)
+import           Clash.Annotations.SynthesisAttributes (Attr (StringAttr))
 import           Clash.Annotations.Primitive (HDL(VHDL))
 import           Clash.Backend           (HasUsageMap (..), HWKind(..), hdlHWTypeKind, hdlKind)
 import           Clash.Core.DataCon      (DataCon (..))
@@ -387,11 +387,20 @@ coreTypeToHWType builtInTranslation reprs m ty = do
   case htyM of
     Just hty -> return hty
     _ -> do
-      hty0M <- builtInTranslation reprs m ty
+      hty0M <- builtInTranslation reprs m ty''
       hty1  <- go hty0M ty
       modify (Map.insert ty hty1)
       return hty1
  where
+  -- Wrap the type in an annotated type (if this is not already the case) with a representation of the type as "clashtype"
+  ty'' :: Type
+  ty'' = AnnType [tyrep] ty
+  --ty'' = case ty of
+  --  AnnType attrs typ -> AnnType attrs typ-- (tyrep:attrs) typ
+  --  _                 -> AnnType [] ty
+  tyrep :: Attr Text
+  tyrep = StringAttr (Text.pack "clashtype") (Text.pack "type") -- $ show ty)
+
   -- Try builtin translation; for now this is hardcoded to be the one in ghcTypeToHWType
   go :: Maybe (Either String FilteredHWType)
      -> Type
