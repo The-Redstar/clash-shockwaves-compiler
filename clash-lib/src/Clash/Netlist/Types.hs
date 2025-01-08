@@ -503,7 +503,7 @@ hwTypeDomain = \case
 -- | Extract hardware attributes from Annotated. Returns an empty list if
 -- non-Annotated given or if Annotated has an empty list of attributes.
 hwTypeAttrs :: HWType -> [Attr Text]
-hwTypeAttrs (Annotated attrs _type) = attrs
+hwTypeAttrs (Annotated attrs type) = attrs ++ hwTypeAttrs type
 hwTypeAttrs _                       = []
 
 -- | Specifies how to wire up a component instance
