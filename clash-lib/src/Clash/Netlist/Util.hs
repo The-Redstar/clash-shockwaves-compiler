@@ -383,28 +383,37 @@ coreTypeToHWType
   -- ^ Type to convert to HWType
   -> State HWMap (Either String FilteredHWType)
 coreTypeToHWType builtInTranslation reprs m ty = do
-  htyM <- Map.lookup ty <$> get
+  htyM <- Map.lookup ty <$> get -- lookup ty in the HWMap (the state), ::Maybe(Either String FilteredHWType)
   case htyM of
-    Just hty -> return hty
+    Just hty -> return hty -- if already translated, return result
     _ -> do
-      hty0M <- builtInTranslation reprs m ty''
-      hty1  <- go hty0M ty
-      modify (Map.insert ty hty1)
+      hty0M <- builtInTranslation reprs m ty -- :: Maybe (Either ...)
+      hty1  <- go hty0M ty -- if builtintranslation fails, construct it instead :: Either ... ...
+      let hty1' = typeAnnotate hty1
+      modify (Map.insert ty hty1')
       return hty1
  where
   -- Wrap the type in an annotated type (if this is not already the case) with a representation of the type as "clashtype"
-  ty'' :: Type
-  ty'' = AnnType [tyrep] ty
+  --ty'' :: Type
+  --ty'' = AnnType [tyrep] ty
   --ty'' = case ty of
   --  AnnType attrs typ -> AnnType attrs typ-- (tyrep:attrs) typ
   --  _                 -> AnnType [] ty
+
+  typeAnnotate :: (Either String FilteredHWType) -> (Either String FilteredHWType)
+  typeAnnotate (Left a) = (Left a)
+  typeAnnotate (Right (FilteredHWType hty rest)) = Right $ FilteredHWType (case hty of
+      Annotated attr hty' -> Annotated (tyrep:attr) hty'
+      hty'                -> Annotated [tyrep]      hty'
+    ) rest
+
   tyrep :: Attr Text
   tyrep = StringAttr (Text.pack "clashtype") (Text.pack "type") -- $ show ty)
 
   -- Try builtin translation; for now this is hardcoded to be the one in ghcTypeToHWType
   go :: Maybe (Either String FilteredHWType)
      -> Type
-     -> State (Map Type (Either String FilteredHWType))
+     -> State (Map Type (Either String FilteredHWType)) -- State HWMap (either)
               (Either String FilteredHWType)
   go (Just hwtyE) _ = pure $ maybeConvertToCustomRepr reprs ty <$> hwtyE
   -- Strip transparant types:

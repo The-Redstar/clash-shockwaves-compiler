@@ -981,7 +981,10 @@ mkDcApplication
     -- ^ DataCon Arguments
     -> NetlistMonad (Expr,[Declaration])
     -- ^ Returned expression and a list of generate BlackBox declarations
-mkDcApplication declType [dstHType] bndr dc args = do
+mkDcApplication declType [dstHType'] bndr dc args = do
+  let dstHType = case dstHType' of
+                    Annotated _ ty -> ty
+                    _ -> dstHType'
   let dcNm = nameOcc (dcName dc)
   tcm <- Lens.view tcCache
   let argTys = map (inferCoreTypeOf tcm) args
@@ -1117,6 +1120,7 @@ mkDcApplication declType [dstHType] bndr dc args = do
         -- ByteArray# are non-translatable / void, except when they're literals
         , (a@(HW.Literal Nothing (NumLit _)):_) <- argExprs
         -> pure a
+--      Annotated _ dstHType' -> go dstHType'
       _ ->
         error $ $(curLoc) ++ "mkDcApplication undefined for: " ++ show (dstHType,dc,args,argHWTys)
 
