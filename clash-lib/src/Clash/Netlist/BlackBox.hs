@@ -1097,7 +1097,7 @@ mkFunInput parentName resId e =
                   (_,resTy) = splitFunTys tcm eTy
 
               resHTyM0 <- coreTypeToHWTypeM resTy
-              let resHTyM1 = (\fHwty -> (stripFiltered fHwty, flattenFiltered fHwty)) <$> resHTyM0
+              let resHTyM1 = fmap (\(t,b) -> (removeAnnotation t,b)) $ (\fHwty -> (stripFiltered fHwty, flattenFiltered fHwty)) <$> resHTyM0
 
               case resHTyM1 of
                 -- Special case where coreTypeToHWTypeM determined a type to

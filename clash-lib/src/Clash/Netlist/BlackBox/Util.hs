@@ -62,10 +62,10 @@ import           Clash.Netlist.BlackBox.Parser
 import           Clash.Netlist.BlackBox.Types
 import           Clash.Netlist.Types
   (BlackBoxContext (..), Expr (..), HWType (..), Literal (..), Modifier (..),
-   Declaration(BlackBoxD))
+   Declaration(BlackBoxD), removeAnnotation)
 import qualified Clash.Netlist.Id                as Id
 import qualified Clash.Netlist.Types             as N
-import           Clash.Netlist.Util              (typeSize, isVoid, stripAttributes, stripVoid)
+import           Clash.Netlist.Util              (typeSize, isVoid, stripAttributes, stripVoid, stripVoidAttributes)
 import           Clash.Signal.Internal
   (ResetKind(..), ResetPolarity(..), InitBehavior(..), VDomainConfiguration (..))
 import           Clash.Util
@@ -457,7 +457,7 @@ renderElem b (SigD e m) = do
 
 renderElem b (Period n) = do
   let (_, ty, _) = bbInputs b !! n
-  case stripVoid ty of
+  case stripVoidAttributes ty of
     KnownDomain _ period _ _ _ _ ->
       return $ const $ Text.pack $ show period
     _ ->
@@ -565,7 +565,7 @@ renderElem b (IF c t f) = do
 
       (IsActiveEnable n) -> pure $
         let (e, ty, _) = bbInputs b !! n in
-        case ty of
+        case removeAnnotation ty of
           Enable _ ->
             case e of
               DataCon _ _ [Literal Nothing (BoolLit True)]  -> 0
@@ -642,7 +642,7 @@ generalGetDomainConf
   :: forall m. (Monad m, HasCallStack)
   => (m DomainMap) -- ^ a way to get the `DomainMap`
   -> HWType -> m VDomainConfiguration
-generalGetDomainConf getDomainMap ty = case (snd . stripAttributes . stripVoid) ty of
+generalGetDomainConf getDomainMap ty = case stripVoidAttributes ty of -- remove annotation, and if it's a void, that void too
   KnownDomain dom period activeEdge resetKind initBehavior resetPolarity ->
     pure $ VDomainConfiguration (Data.Text.unpack dom) (fromIntegral period) activeEdge resetKind initBehavior resetPolarity
 
@@ -699,6 +699,8 @@ lineToType b [(Typ (Just n))] = let (_,ty,_) = bbInputs b !! n
 lineToType b [(TypElem t)]    = case lineToType b [t] of
                                   Vector _ elTy -> elTy
                                   MemBlob _ m -> BitVector m
+                                  (Annotated attr (Vector _ elTy)) -> Annotated attr elTy
+                                  (Annotated attr (MemBlob _ m)) -> Annotated attr (BitVector m) -- MIGHT BE INCORRECT; ANNOTATION IS PROBABLY FOR LIST TYPE
                                   _ -> error $ $(curLoc) ++ "Element type selection of a non-vector-like type"
 lineToType b [(IndexType (Lit n))] =
   case bbInputs b !! n of
@@ -790,10 +792,10 @@ renderTag b (Size e)        = return . Text.pack . show . typeSize $ lineToType 
 
 renderTag b (Length e) = return . Text.pack . show . vecLen $ lineToType b [e]
   where
-    vecLen (Vector n _)                = n
-    vecLen (Void (Just (Vector n _)))  = n
-    vecLen (MemBlob n _)               = n
-    vecLen (Void (Just (MemBlob n _))) = n
+    vecLen (Vector n _)     = n
+    vecLen (MemBlob n _)    = n
+    vecLen (Void (Just v))  = vecLen v
+    vecLen (Annotated _ v)  = vecLen v
     vecLen thing =
       error $ $(curLoc) ++ "vecLen of a non-vector-like type: " ++ show thing
 
@@ -801,13 +803,15 @@ renderTag b (Depth e) = return . Text.pack . show . treeDepth $ lineToType b [e]
   where
     treeDepth (RTree n _)               = n
     treeDepth (Void (Just (RTree n _))) = n
+    treeDepth (Annotated _ t)           = treeDepth t
     treeDepth thing =
       error $ $(curLoc) ++ "treeDepth of a non-tree type: " ++ show thing
 
 renderTag b (MaxIndex e) = return . Text.pack . show . vecLen $ lineToType b [e]
   where
-    vecLen (Vector n _)  = n-1
-    vecLen (MemBlob n _) = n-1
+    vecLen (Vector n _)    = n-1
+    vecLen (MemBlob n _)   = n-1
+    vecLen (Annotated _ v) = vecLen v
     vecLen thing =
       error $ $(curLoc) ++ "vecLen of a non-vector-like type: " ++ show thing
 

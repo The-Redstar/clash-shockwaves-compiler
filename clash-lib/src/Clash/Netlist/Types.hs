@@ -491,6 +491,27 @@ annotated :: [Attr Text] -> HWType -> HWType
 annotated [] t = t
 annotated attrs t = Annotated attrs t
 
+removeAnnotation :: HWType -> HWType
+removeAnnotation (Annotated _ t) = removeAnnotation t
+removeAnnotation t = t
+
+equalModuloAnnotations :: HWType -> HWType -> Bool
+equalModuloAnnotations (Annotated _ a) b = equalModuloAnnotations a b
+equalModuloAnnotations a (Annotated _ b) = equalModuloAnnotations a b
+
+equalModuloAnnotations (Void (Just ta)) (Void (Just tb)) = equalModuloAnnotations ta tb
+equalModuloAnnotations (Vector sa ta) (Vector sb tb) = (sa==sb) && equalModuloAnnotations ta tb
+equalModuloAnnotations (RTree sa ta) (RTree sb tb) = (sa==sb) && equalModuloAnnotations ta tb
+equalModuloAnnotations (Product na la tsa) (Product nb lb tsb) = (na==nb) && (la==lb) && all (\(ta,tb) -> equalModuloAnnotations ta tb) (zip tsa tsb)
+equalModuloAnnotations (SP na psa) (SP nb psb) = (na==nb) && all compare (zip psa psb)
+  where compare ((na, tsa),(nb, tsb)) = (na==nb) && all (\(ta,tb) -> equalModuloAnnotations ta tb) (zip tsa tsb)
+equalModuloAnnotations (BiDirectional da ta) (BiDirectional db tb) = (da==db) && equalModuloAnnotations ta tb
+equalModuloAnnotations (CustomSP na ra sa psa) (CustomSP nb rb sb psb) = (na==nb) && (ra==rb) && (sa==sb) && all compare (zip psa psb)
+  where compare ((ra, na, tsa),(rb, nb, tsb)) = (ra==rb) && (na==nb) && all (\(ta,tb) -> equalModuloAnnotations ta tb) (zip tsa tsb)
+equalModuloAnnotations (CustomProduct na ra sa la tsa) (CustomProduct nb rb sb lb tsb) = (na==nb) && (ra==rb) && (sa==sb) && (la==lb) && all compare (zip tsa tsb)
+  where compare ((aa,ta),(ab,tb)) = (aa==ab) && equalModuloAnnotations ta tb
+equalModuloAnnotations a b = a==b
+
 hwTypeDomain :: HWType -> Maybe DomainName
 hwTypeDomain = \case
   Clock dom -> Just dom

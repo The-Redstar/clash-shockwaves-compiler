@@ -156,6 +156,11 @@ stripVoid :: HWType -> HWType
 stripVoid (Void (Just e)) = stripVoid e
 stripVoid e = e
 
+stripVoidAttributes :: HWType -> HWType
+stripVoidAttributes (Void (Just e)) = stripVoidAttributes e
+stripVoidAttributes (Annotated _ e) = stripVoidAttributes e
+stripVoidAttributes e = e
+
 flattenFiltered :: FilteredHWType -> [[Bool]]
 flattenFiltered (FilteredHWType _hwty filtered) = map (map fst) filtered
 
@@ -165,6 +170,7 @@ isVoidMaybe _dflt (Just t) = isVoid t
 
 -- | Determines if type is a zero-width construct ("void")
 isVoid :: HWType -> Bool
+isVoid (Annotated _attr hty) = isVoid hty
 isVoid Void {} = True
 isVoid _       = False
 
@@ -390,7 +396,7 @@ coreTypeToHWType builtInTranslation reprs m ty = do
       hty0M <- builtInTranslation reprs m ty -- :: Maybe (Either ...)
       hty1  <- go hty0M ty -- if builtintranslation fails, construct it instead :: Either ... ...
       let hty1' = typeAnnotate hty1
-      modify (Map.insert ty hty1')
+      modify (Map.insert ty hty1') --hty1'
       return hty1
  where
   -- Wrap the type in an annotated type (if this is not already the case) with a representation of the type as "clashtype"
@@ -2062,10 +2068,11 @@ expandTopEntity ihwtys (oId, ohwty) topEntityM
   goPort _hint (FilteredHWType hwty _) (PortName pn) =
     pure (ExpandedPortName hwty (Left (Text.pack pn)))
   goPort hint0 fHwty@(FilteredHWType hwty0 fields0) pp@(PortProduct p ps0)
-    -- Attrs not allowed on product types
-    | isProduct fHwty
-    , (_:_) <- attrs
-    = Left (AttrError attrs)
+    -- Attrs not allowed on product types -- <-- disable. I need them
+--    | isProduct fHwty
+--    , (_:_) <- attrs
+--    , BUT NOT [StringAttr "clashtype" _]
+--    = Left (AttrError attrs)
 
     -- Product types (products, vec, rtree) of which all but one field are
     -- zero-width.
@@ -2108,10 +2115,11 @@ expandTopEntity ihwtys (oId, ohwty) topEntityM
     -> FilteredHWType
     -> Either ExpandError (ExpandedPortName (Either Text Text))
   goNoPort hint fHwty@(FilteredHWType hwty0 fields0)
-    -- Attrs not allowed on product types
-    | isProduct fHwty
-    , (_:_) <- attrs
-    = Left (AttrError attrs)
+    -- Attrs not allowed on product types <- removed because I need them for type annotations
+--    | isProduct fHwty
+--    , (_:_) <- attrs
+--    , attrs != [()]
+--    = Left (AttrError attrs)
 
     -- Product types (products, vec, rtree) of which all but one field are
     -- zero-width.

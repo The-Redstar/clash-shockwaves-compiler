@@ -1005,7 +1005,7 @@ mkDcApplication declType [dstHType'] bndr dc args = do
 
   fmap (,argDecls) $! case (hWTysFiltered,argExprsFiltered) of
     -- Is the DC just a newtype wrapper?
-    ([Just argHwTy],[argExpr]) | argHwTy == dstHType ->
+    ([Just argHwTy],[argExpr]) | HW.equalModuloAnnotations argHwTy dstHType ->
       return (HW.DataCon dstHType (DC (Void Nothing,-1)) [argExpr])
     _ -> case dstHType of
       SP _ dcArgPairs -> do
@@ -1062,7 +1062,7 @@ mkDcApplication declType [dstHType'] bndr dc args = do
                       _ -> error $ $(curLoc) ++ "Unexpected number of arguments for `Cons`: " ++ showPpr args
       Vector _ _ -> case argExprsFiltered of
                       [e1,e2] -> return (HW.DataCon dstHType VecAppend [e1,e2])
-                      _ -> error $ $(curLoc) ++ "Unexpected number of arguments for `Cons`: " ++ showPpr args
+                      _ -> error $ $(curLoc) ++ "Unexpected number of arguments for `Cons`: " ++ showPpr args -- <-- crashes here
       MemBlob _ _ ->
         case compare 6 (length argExprsFiltered) of
           EQ -> return (HW.DataCon dstHType (DC (dstHType,0)) argExprsFiltered)
@@ -1122,7 +1122,7 @@ mkDcApplication declType [dstHType'] bndr dc args = do
         -> pure a
 --      Annotated _ dstHType' -> go dstHType'
       _ ->
-        error $ $(curLoc) ++ "mkDcApplication undefined for: " ++ show (dstHType,dc,args,argHWTys)
+        error $ $(curLoc) ++ "mkDcApplication undefined for: " ++ show (dstHType,dc,args,argHWTys,dcNm)
 
 -- Handle MultiId assignment
 mkDcApplication declType dstHTypes (MultiId argNms) _ args = do
