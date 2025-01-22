@@ -54,6 +54,7 @@ module Clash.Core.Type
   , normalizeType
   , varAttrs
   , typeAttrs
+  , backRepr
   )
 where
 
@@ -67,7 +68,7 @@ import           Data.List              (foldl')
 #endif
 import           Data.List.Extra        (splitAtList)
 import           Data.Maybe             (isJust, mapMaybe)
-import           Data.Text              (Text)
+import           Data.Text              (Text,pack)
 import           GHC.Base               (isTrue#,(==#))
 import           GHC.Generics           (Generic(..))
 import           GHC.Integer            (smallInteger)
@@ -77,6 +78,7 @@ import           GHC.TypeLits           (type TypeError, ErrorMessage(Text, (:<>
 import           GHC.Base               (ord)
 import           Data.Char              (chr)
 import           Data.Maybe             (fromMaybe)
+-- import qualified Data.Text              as Text
 import           Data.Text.Extra        (showt)
 #endif
 
@@ -138,6 +140,62 @@ data Type
   | LitTy    !LitTy             -- ^ Type literal
   | AnnType  [Attr Text] !Type  -- ^ Annotated type, see Clash.Annotations.SynthesisAttributes
   deriving (Show, Generic, NFData, Binary)
+
+
+-- | Print the type in Haskell-parsable format
+backRepr :: Type -> Text
+
+backRepr (AppTy (AppTy (ConstTy (TyCon Name{nameOcc="Clash.Signal.Internal.Signal"})) _) ty) = backRepr ty
+
+
+backRepr (VarTy TyVar{varName=Name{nameOcc=name}}) = name
+backRepr (VarTy Id{varName=Name{nameOcc=name}}) = name
+-- data Var a
+--   -- | Constructor for type variables
+--   = TyVar
+--   { varName :: !(Name a)
+--   , varUniq :: {-# UNPACK #-} !Unique
+--   -- ^ Invariant: forall x . varUniq x ~ nameUniq (varName x)
+--   , varType :: Kind
+--   }
+--   -- | Constructor for term variables
+--   | Id
+--   { varName :: !(Name a)
+--   , varUniq :: {-# UNPACK #-} !Unique
+--   -- ^ Invariant: forall x . varUniq x ~ nameUniq (varName x)
+--   , varType :: Type
+--   , idScope :: IdScope
+--   }
+
+backRepr (ConstTy (TyCon Name{nameOcc=name})) = name
+
+backRepr (ConstTy Arrow) = pack "(->)" -- probably an exception?
+-- data ConstTy
+--   = TyCon !TyConName -- ^ TyCon type
+--   | Arrow            -- ^ Function type
+-- data Name a
+-- = Name
+--   { nameSort :: NameSort
+--   , nameOcc  :: !OccName
+--   , nameUniq :: {-# UNPACK #-} !Unique
+--   , nameLoc  :: !SrcSpan
+--   }
+
+backRepr (ForAllTy tv ty) = pack "ForAllTy???"
+
+backRepr (AppTy ty1 ty2) = pack "(" <> backRepr ty1 <> pack " " <> backRepr ty2 <> pack ")"
+-- need special case for GHC.Tuple.(,)
+-- and for (Clash.Signal.Internal.Signal \"System\")
+
+backRepr (LitTy (NumTy n)) = pack $ show n
+backRepr (LitTy (SymTy s)) = pack $ show s
+backRepr (LitTy (CharTy c)) = pack $ show c
+-- data LitTy
+--   = NumTy !Integer
+--   | SymTy !String
+--   | CharTy !Char
+backRepr (AnnType _ ty) = backRepr ty --recurse
+
 
 instance TypeError (
         'Text "A broken implementation of Hashable Type has been "

@@ -103,7 +103,7 @@ import           Clash.Core.TermInfo
 import           Clash.Core.TyCon
   (TyCon (FunTyCon), TyConName, TyConMap, tyConDataCons)
 import           Clash.Core.Type
-  (Type (..), TyVar, TypeView (..), coreView1, normalizeType, splitTyConAppM, tyView)
+  (Type (..), TyVar, TypeView (..), coreView1, normalizeType, splitTyConAppM, tyView, backRepr)
 import           Clash.Core.Util
   (substArgTys, tyLitShow)
 import           Clash.Core.Var
@@ -414,7 +414,7 @@ coreTypeToHWType builtInTranslation reprs m ty = do
     ) rest
 
   tyrep :: Attr Text
-  tyrep = StringAttr (Text.pack "clashtype") (Text.pack "type") -- $ show ty)
+  tyrep = StringAttr (Text.pack "clashtype") (backRepr ty) -- $ show ty)
 
   -- Try builtin translation; for now this is hardcoded to be the one in ghcTypeToHWType
   go :: Maybe (Either String FilteredHWType)
