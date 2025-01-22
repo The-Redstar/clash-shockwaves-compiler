@@ -822,12 +822,14 @@ modifier
   -- ^ Range selected so far
   -> Modifier
   -> Maybe (Range,HWType)
+modifier r (Sliced (Annotated _ ty@(BitVector _),start,end)) = modifier r (Sliced (ty,start,end))
 modifier r (Sliced (BitVector _,start,end)) =
   Just (continueWithRange [(start,end)] hty r)
   where
     hty = BitVector (start-end-1)
 
 
+modifier r (Indexed (Annotated _ ty@(SP _ _),dcI,fI)) = modifier r (Indexed (ty,dcI,fI))
 modifier r (Indexed (ty@(SP _ args),dcI,fI)) =
   Just (continueWithRange [(start,end)] argTy r)
   where
@@ -838,6 +840,7 @@ modifier r (Indexed (ty@(SP _ args),dcI,fI)) =
     start    = typeSize ty - 1 - conSize ty - other
     end      = start - argSize + 1
 
+modifier r (Indexed (Annotated _ ty@(Product {}),x,fI)) = modifier r (Indexed (ty,x,fI))
 modifier r (Indexed (ty@(Product _ _ argTys),_,fI)) =
   Just (continueWithRange [(start,end)] argTy r)
   where
@@ -847,6 +850,7 @@ modifier r (Indexed (ty@(Product _ _ argTys),_,fI)) =
     start   = typeSize ty - 1 - otherSz
     end     = start - argSize + 1
 
+modifier r (Indexed (Annotated _ ty@(Vector {}),1,0)) = modifier r (Indexed (ty,1,0))
 modifier r (Indexed (ty@(Vector _ argTy),1,0)) =
   Just (continueWithRange [(start,end)] argTy r)
   where
@@ -854,6 +858,7 @@ modifier r (Indexed (ty@(Vector _ argTy),1,0)) =
     start   = typeSize ty - 1
     end     = start - argSize + 1
 
+modifier r (Indexed (Annotated _ ty@(Vector {}),1,1)) = modifier r (Indexed (ty,1,1))
 modifier r (Indexed (ty@(Vector n argTy),1,1)) =
   Just (continueWithRange [(start,0)] hty r)
   where
@@ -861,11 +866,13 @@ modifier r (Indexed (ty@(Vector n argTy),1,1)) =
     start   = typeSize ty - argSize - 1
     hty     = Vector (n-1) argTy
 
+modifier r (Indexed (Annotated _ ty@(RTree {}),0,0)) = modifier r (Indexed (ty,0,0))
 modifier r (Indexed (ty@(RTree 0 argTy),0,0)) =
   Just (continueWithRange [(start,0)] argTy r)
   where
     start   = typeSize ty - 1
 
+modifier r (Indexed (Annotated _ ty@(RTree {}),1,0)) = modifier r (Indexed (ty,1,0))
 modifier r (Indexed (ty@(RTree d argTy),1,0)) =
   Just (continueWithRange [(start,end)] hty r)
   where
@@ -873,6 +880,7 @@ modifier r (Indexed (ty@(RTree d argTy),1,0)) =
     end     = typeSize ty `div` 2
     hty     = RTree (d-1) argTy
 
+modifier r (Indexed (Annotated _ ty@(RTree {}),1,1)) = modifier r (Indexed (ty,1,1))
 modifier r (Indexed (ty@(RTree d argTy),1,1)) =
   Just (continueWithRange [(start,0)] hty r)
   where
@@ -882,6 +890,7 @@ modifier r (Indexed (ty@(RTree d argTy),1,1)) =
 -- This is a HACK for Clash.Netlist.Util.mkTopOutput
 -- Vector's don't have a 10'th constructor, this is just so that we can
 -- recognize the particular case
+modifier r (Indexed (Annotated _ ty@(Vector {}),10,fI)) = modifier r (Indexed (ty,10,fI))
 modifier r (Indexed (ty@(Vector _ argTy),10,fI)) =
   Just (continueWithRange [(start,end)] argTy r)
   where
@@ -892,6 +901,7 @@ modifier r (Indexed (ty@(Vector _ argTy),10,fI)) =
 -- This is a HACK for Clash.Netlist.Util.mkTopOutput
 -- RTree's don't have a 10'th constructor, this is just so that we can
 -- recognize the particular case
+modifier r (Indexed (Annotated _ ty@(RTree {}),10,fI)) = modifier r (Indexed (ty,10,fI))
 modifier r (Indexed (ty@(RTree _ argTy),10,fI)) =
   Just (continueWithRange [(start,end)] argTy r)
   where
@@ -899,6 +909,7 @@ modifier r (Indexed (ty@(RTree _ argTy),10,fI)) =
     start   = typeSize ty - (fI * argSize) - 1
     end     = start - argSize + 1
 
+modifier r (Indexed (Annotated _ (CustomSP _typName _dataRepr _size args),dcI,fI)) = modifier r (Indexed (CustomSP _typName _dataRepr _size args,dcI,fI))
 modifier r (Indexed (CustomSP _typName _dataRepr _size args,dcI,fI)) =
   Just (continueWithRange ses argTy r)
   where
@@ -906,6 +917,10 @@ modifier r (Indexed (CustomSP _typName _dataRepr _size args,dcI,fI)) =
     (ConstrRepr' _name _n _mask _value anns, _, argTys) = args !! dcI
     argTy = argTys !! fI
 
+modifier r (Indexed (Annotated _ ty@(CustomProduct _typName dataRepr _size _maybeFieldNames _),x,fI))
+  | DataRepr' _typ _size [cRepr] <- dataRepr
+  , ConstrRepr' _cName _pos _mask _val _ <- cRepr
+  = modifier r (Indexed (ty,x,fI))
 modifier r (Indexed (CustomProduct _typName dataRepr _size _maybeFieldNames args,_,fI))
   | DataRepr' _typ _size [cRepr] <- dataRepr
   , ConstrRepr' _cName _pos _mask _val fieldAnns <- cRepr
@@ -913,6 +928,7 @@ modifier r (Indexed (CustomProduct _typName dataRepr _size _maybeFieldNames args
  where
   argTy = map snd args !! fI
 
+modifier r (DC (Annotated _ ty@(SP _ _),x)) = modifier r (DC (ty,x))
 modifier r (DC (ty@(SP _ _),_)) =
   Just (continueWithRange [(start,end)] ty r)
   where
